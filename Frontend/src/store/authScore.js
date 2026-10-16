@@ -2,9 +2,13 @@ import { create } from "zustand";
 import axios from "axios";
 
 const formatApiUrl = () => {
-	const rawUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/+$/, "");
+	let rawUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/+$/, "");
 	if (!rawUrl) {
 		return import.meta.env.MODE === "production" ? "/api/auth" : "http://localhost:5001/api/auth";
+	}
+	// Auto-prepend https:// if the user provided domain without protocol (e.g. authapp-production.up.railway.app)
+	if (!rawUrl.startsWith("http://") && !rawUrl.startsWith("https://") && !rawUrl.startsWith("/")) {
+		rawUrl = `https://${rawUrl}`;
 	}
 	// Automatically append /api/auth if omitted by user in environment variables
 	if (rawUrl.endsWith("/api/auth")) {
