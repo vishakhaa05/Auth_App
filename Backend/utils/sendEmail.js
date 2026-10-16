@@ -43,7 +43,11 @@ export const isConfigured = () => {
  * Immune to cloud provider SMTP firewall blocks on Render / AWS / Vercel.
  */
 const sendViaResend = async ({ to, subject, html, text }) => {
-	const sender = (process.env.EMAIL_FROM || "Auth App <onboarding@resend.dev>").trim();
+	let sender = (process.env.RESEND_FROM || process.env.EMAIL_FROM || "Auth App <onboarding@resend.dev>").trim();
+	// Personal emails like @gmail.com cannot be used as 'from' on Resend without domain verification
+	if (sender.includes("@gmail.com") || sender.includes("@yahoo.com") || sender.includes("@outlook.com") || !sender.includes("@")) {
+		sender = "Auth App <onboarding@resend.dev>";
+	}
 	const response = await fetch("https://api.resend.com/emails", {
 		method: "POST",
 		headers: {
