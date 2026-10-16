@@ -4,17 +4,22 @@ import { useAuthStore } from "../store/authScore";
 import Input from "../components/Input";
 import { ArrowLeft, Loader, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 
 const ForgotPasswordPage = () => {
     const [email, setEmail] = useState("");
     const [isSubmitted, setIsSubmitted] = useState(false);
 
-    const { isLoading, forgotPassword } = useAuthStore();
+    const { isLoading, forgotPassword, error } = useAuthStore();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        await forgotPassword(email);
-        setIsSubmitted(true);
+        try {
+            await forgotPassword(email);
+            setIsSubmitted(true);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to send reset link");
+        }
     };
 
     return (
@@ -42,6 +47,7 @@ const ForgotPasswordPage = () => {
                             onChange={(e) => setEmail(e.target.value)}
                             required
                         />
+                        {error && <p className='text-red-500 text-sm font-semibold text-center mb-3'>{error}</p>}
                         <motion.button
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}

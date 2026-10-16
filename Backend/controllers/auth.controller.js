@@ -17,6 +17,42 @@ export const signup = async (req, res) => {
 		const normalizedEmail = email.toLowerCase().trim();
 		const userAlreadyExists = await User.findOne({ email: normalizedEmail });
 		if (userAlreadyExists) {
+			if (!userAlreadyExists.isVerified) {
+				// User previously started signup but never completed verification; refresh credentials & token
+				const verificationToken = crypto.randomInt(100000, 1000000).toString();
+				userAlreadyExists.password = await bcryptjs.hash(password, 10);
+				userAlreadyExists.name = name.trim();
+				userAlreadyExists.verificationToken = verificationToken;
+				userAlreadyExists.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+				userAlreadyExists.lastVerificationSent = new Date();
+				const { refreshToken } = generateTokensAndSetCookies(res, userAlreadyExists._id);
+				userAlreadyExists.refreshToken = refreshToken;
+				await userAlreadyExists.save();
+
+				let emailSent = true;
+				try {
+					await sendVerificationEmail(userAlreadyExists.email, verificationToken);
+				} catch (mailErr) {
+					emailSent = false;
+					console.warn("[EMAIL SERVICE] Could not send verification email on existing unverified signup:", mailErr.message);
+				}
+
+				return res.status(200).json({
+					success: true,
+					message: emailSent
+						? "Account already registered but unverified. A new verification code has been sent."
+						: "Account updated. Note: Email service could not deliver OTP. Check SMTP settings in Render.",
+					user: {
+						id: userAlreadyExists._id,
+						email: userAlreadyExists.email,
+						name: userAlreadyExists.name,
+						isVerified: userAlreadyExists.isVerified,
+						role: userAlreadyExists.role,
+						createdAt: userAlreadyExists.createdAt,
+						updatedAt: userAlreadyExists.updatedAt,
+					},
+				});
+			}
 			return res.status(400).json({ success: false, message: "User already exists" });
 		}
 
@@ -37,11 +73,19 @@ export const signup = async (req, res) => {
 		user.refreshToken = refreshToken;
 		await user.save();
 
-		await sendVerificationEmail(user.email, verificationToken);
+		let emailSent = true;
+		try {
+			await sendVerificationEmail(user.email, verificationToken);
+		} catch (mailErr) {
+			emailSent = false;
+			console.warn("[EMAIL SERVICE] Failed to send verification email on new signup:", mailErr.message);
+		}
 
 		res.status(201).json({
 			success: true,
-			message: "User created successfully. Please verify your email.",
+			message: emailSent
+				? "User created successfully. Please verify your email."
+				: "Account created! Note: Email delivery failed. Please verify SMTP credentials in Render.",
 			user: {
 				id: user._id,
 				email: user.email,
@@ -133,12 +177,16 @@ export const login = async (req, res) => {
 			user.lastVerificationSent = new Date();
 			await user.save();
 
-			await sendVerificationEmail(user.email, verificationToken);
+			try {
+				await sendVerificationEmail(user.email, verificationToken);
+			} catch (mailErr) {
+				console.warn("[EMAIL SERVICE] Failed to send verification email on unverified login:", mailErr.message);
+			}
 
 			return res.status(400).json({
 				success: false,
 				isNotVerified: true,
-				message: "Email not verified. A new verification code has been sent to your email.",
+				message: "Email not verified. Please check your inbox or request a new code.",
 			});
 		}
 
@@ -227,7 +275,15 @@ export const forgotPassword = async (req, res) => {
 
 		// Send reset link using configured CLIENT_URL
 		const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
-		await sendPasswordResetEmail(user.email, `${clientUrl}/reset-password/${resetToken}`);
+		try {
+			await sendPasswordResetEmail(user.email, `${clientUrl}/reset-password/${resetToken}`);
+		} catch (mailErr) {
+			console.error("[EMAIL SERVICE] Failed to deliver password reset email:", mailErr.message);
+			return res.status(500).json({
+				success: false,
+				message: `Email delivery failed: ${mailErr.message}`,
+			});
+		}
 
 		res.status(200).json({
 			success: true,

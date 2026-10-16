@@ -49,40 +49,57 @@ export const getTransporter = () => {
 	}
 
 	const host = process.env.SMTP_HOST || "smtp.gmail.com";
+	const isGmail = host === "smtp.gmail.com" || !process.env.SMTP_HOST;
 	const port = parseInt(process.env.SMTP_PORT || "465", 10);
 	const isSecure = port === 465;
 	const user = (process.env.SMTP_USER || "").trim();
 	// Google App Passwords often contain spaces (e.g. "abcd efgh ijkl mnop"), strip them safely
 	const pass = (process.env.SMTP_PASS || "").replace(/\s+/g, "");
 
-	cachedTransporter = nodemailer.createTransport({
-		host,
-		port,
-		secure: isSecure, // true for 465 (SSL), false for 587 (TLS/STARTTLS)
-		...(port === 587 && { requireTLS: true }),
-		auth: {
-			user,
-			pass,
-		},
-		pool: true, // reuse pooled connections
-		maxConnections: 5,
-		maxMessages: 100,
-		connectionTimeout: 10000, // 10s connection timeout
-		greetingTimeout: 10000,
-		socketTimeout: 15000,
-	});
+	const transportConfig = isGmail
+		? {
+				service: "gmail",
+				auth: {
+					user,
+					pass,
+				},
+				connectionTimeout: 10000,
+				greetingTimeout: 10000,
+				socketTimeout: 15000,
+		  }
+		: {
+				host,
+				port,
+				secure: isSecure,
+				...(port === 587 && { requireTLS: true }),
+				auth: {
+					user,
+					pass,
+				},
+				connectionTimeout: 10000,
+				greetingTimeout: 10000,
+				socketTimeout: 15000,
+		  };
 
+	cachedTransporter = nodemailer.createTransport(transportConfig);
 	return cachedTransporter;
 };
 
 /**
- * Optional diagnostic check to verify SMTP connectivity on startup.
- * Non-blocking, fails gracefully without crashing the server.
+ * Diagnostic check to verify SMTP connectivity on startup.
+ * Non-blocking, logs status safely without leaking passwords.
  */
 export const verifyTransporter = async () => {
 	try {
+		console.log("[EMAIL SERVICE] Configuration diagnostic:", {
+			SMTP_USER: process.env.SMTP_USER ? `${process.env.SMTP_USER.slice(0, 3)}***` : "MISSING",
+			SMTP_PASS: process.env.SMTP_PASS ? "[SET]" : "MISSING",
+			SMTP_HOST: process.env.SMTP_HOST || "smtp.gmail.com (default)",
+			SMTP_PORT: process.env.SMTP_PORT || "465 (default)",
+		});
+
 		if (!isConfigured()) {
-			console.warn("[EMAIL SERVICE] SMTP_USER or SMTP_PASS not set in .env. Running in unconfigured/mock mode.");
+			console.warn("[EMAIL SERVICE] SMTP_USER or SMTP_PASS not set. Emails will not send until credentials are provided in your environment variables.");
 			return false;
 		}
 
@@ -91,7 +108,6 @@ export const verifyTransporter = async () => {
 		console.log("[EMAIL SERVICE] Gmail SMTP transporter verified successfully. Ready to send emails.");
 		return true;
 	} catch (error) {
-		// Log sanitized error message without leaking sensitive auth details
 		console.warn(`[EMAIL SERVICE] Transporter verification failed: ${error.message || error}`);
 		return false;
 	}
@@ -143,7 +159,7 @@ export const sendEmail = async ({ to, subject, html, text }) => {
 				message: "Email logged in dev mock mode (SMTP credentials missing)",
 			};
 		}
-		throw new Error("Email service is unconfigured: SMTP_USER and SMTP_PASS are required");
+		throw new Error("SMTP credentials are not configured. Please add SMTP_USER and SMTP_PASS (Google App Password) in your Render environment variables.");
 	}
 
 	// 3. Prepare email payload
