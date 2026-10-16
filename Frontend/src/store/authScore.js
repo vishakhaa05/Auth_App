@@ -19,9 +19,13 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post(`${API_URL}/signup`, { email, password, name });
-			set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+			if (response.data && response.data.user) {
+				set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+			} else {
+				set({ user: null, isAuthenticated: false, isLoading: false });
+			}
 		} catch (error) {
-			set({ error: error.response?.data?.message || "Error signing up", isLoading: false });
+			set({ user: null, isAuthenticated: false, error: error.response?.data?.message || "Error signing up", isLoading: false });
 			throw error;
 		} 
 	},
@@ -29,14 +33,18 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post(`${API_URL}/login`, { email, password });
-			set({
-				isAuthenticated: true,
-				user: response.data.user,
-				error: null,
-				isLoading: false,
-			});
+			if (response.data && response.data.user) {
+				set({
+					isAuthenticated: true,
+					user: response.data.user,
+					error: null,
+					isLoading: false,
+				});
+			} else {
+				set({ user: null, isAuthenticated: false, isLoading: false });
+			}
 		} catch (error) {
-			set({ error: error.response?.data?.message || "Error logging in", isLoading: false });
+			set({ user: null, isAuthenticated: false, error: error.response?.data?.message || "Error logging in", isLoading: false });
 			throw error;
 		}
 	},
@@ -47,7 +55,7 @@ export const useAuthStore = create((set) => ({
 			await axios.post(`${API_URL}/logout`);
 			set({ user: null, isAuthenticated: false, error: null, isLoading: false });
 		} catch (error) {
-			set({ error: "Error logging out", isLoading: false });
+			set({ user: null, isAuthenticated: false, error: "Error logging out", isLoading: false });
 			throw error;
 		}
 	},
@@ -55,7 +63,9 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post(`${API_URL}/verify-email`, { code });
-			set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+			if (response.data && response.data.user) {
+				set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+			}
 			return response.data;
 		} catch (error) {
 			set({ error: error.response?.data?.message || "Error verifying email", isLoading: false });
@@ -78,9 +88,14 @@ export const useAuthStore = create((set) => ({
 		set({ isCheckingAuth: true, error: null });
 		try {
 			const response = await axios.get(`${API_URL}/check-auth`);
-			set({ user: response.data.user, isAuthenticated: true, isCheckingAuth: false });
+			// Verify response contains a valid user object (guards against HTML from SPA fallback)
+			if (response.data && response.data.user && typeof response.data.user === "object") {
+				set({ user: response.data.user, isAuthenticated: true, isCheckingAuth: false });
+			} else {
+				set({ user: null, isAuthenticated: false, isCheckingAuth: false });
+			}
 		} catch (error) {
-			set({ error: null, isCheckingAuth: false, isAuthenticated: false });
+			set({ user: null, error: null, isCheckingAuth: false, isAuthenticated: false });
 		}
 	},
 	forgotPassword: async (email) => {
@@ -145,7 +160,10 @@ axios.interceptors.response.use(
 			error.response?.status === 401 && 
 			!originalRequest._retry && 
 			originalRequest.url && 
-			!originalRequest.url.includes("/refresh-token")
+			!originalRequest.url.includes("/refresh-token") &&
+			!originalRequest.url.includes("/check-auth") &&
+			!originalRequest.url.includes("/login") &&
+			!originalRequest.url.includes("/signup")
 		) {
 			originalRequest._retry = true;
 			try {
