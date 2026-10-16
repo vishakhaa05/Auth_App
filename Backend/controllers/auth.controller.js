@@ -274,7 +274,7 @@ export const forgotPassword = async (req, res) => {
 		await user.save();
 
 		// Send reset link using configured CLIENT_URL
-		const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+		const clientUrl = (process.env.CLIENT_URL || "http://localhost:5173").split(",")[0].trim().replace(/\/+$/, "");
 		try {
 			await sendPasswordResetEmail(user.email, `${clientUrl}/reset-password/${resetToken}`);
 		} catch (mailErr) {

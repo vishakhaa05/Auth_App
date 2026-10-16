@@ -6,6 +6,11 @@ import {
 	WELCOME_EMAIL_TEMPLATE,
 } from "./emailTemplates.js";
 
+const getClientUrl = () => {
+	const raw = process.env.CLIENT_URL || "http://localhost:5173";
+	return raw.split(",")[0].trim().replace(/\/+$/, "");
+};
+
 /**
  * Sends a 6-digit email verification code and direct activation link to the user.
  *
@@ -13,7 +18,7 @@ import {
  * @param {string} verificationToken - 6-digit OTP verification code
  */
 export const sendVerificationEmail = async (email, verificationToken) => {
-	const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+	const clientUrl = getClientUrl();
 	const verificationURL = `${clientUrl}/verify-email?code=${verificationToken}`;
 
 	const html = VERIFICATION_EMAIL_TEMPLATE
