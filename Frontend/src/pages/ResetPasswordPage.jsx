@@ -18,7 +18,7 @@ const ResetPasswordPage = () => {
 		e.preventDefault();
 
 		if (password !== confirmPassword) {
-			alert("Passwords do not match");
+			toast.error("Passwords do not match");
 			return;
 		}
 		try {
@@ -30,7 +30,8 @@ const ResetPasswordPage = () => {
 			}, 2000);
 		} catch (error) {
 			console.error(error);
-			toast.error(error.message || "Error resetting password");
+			const errMsg = error.response?.data?.message || error.message || "Error resetting password";
+			toast.error(errMsg);
 		}
 	};
 

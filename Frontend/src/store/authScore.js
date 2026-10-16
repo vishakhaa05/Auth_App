@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/auth";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api/auth";
 axios.defaults.withCredentials = true;
 
 export const useAuthStore = create((set) => ({
@@ -10,7 +10,7 @@ export const useAuthStore = create((set) => ({
 	error: null,
 	isLoading: false,
 	isCheckingAuth: true,
-	//message: null,
+	message: null,
 
 	signup: async (email, password, name) => {
 		set({ isLoading: true, error: null });
@@ -18,7 +18,7 @@ export const useAuthStore = create((set) => ({
 			const response = await axios.post(`${API_URL}/signup`, { email, password, name });
 			set({ user: response.data.user, isAuthenticated: true, isLoading: false });
 		} catch (error) {
-			set({ error: error.response.data.message || "Error signing up", isLoading: false });
+			set({ error: error.response?.data?.message || "Error signing up", isLoading: false });
 			throw error;
 		} 
 	},
@@ -55,7 +55,19 @@ export const useAuthStore = create((set) => ({
 			set({ user: response.data.user, isAuthenticated: true, isLoading: false });
 			return response.data;
 		} catch (error) {
-			set({ error: error.response.data.message || "Error verifying email", isLoading: false });
+			set({ error: error.response?.data?.message || "Error verifying email", isLoading: false });
+			throw error;
+		}
+	},
+	resendVerificationEmail: async (email) => {
+		set({ isLoading: true, error: null });
+		try {
+			const response = await axios.post(`${API_URL}/resend-verification`, { email });
+			set({ isLoading: false, message: response.data.message });
+			return response.data;
+		} catch (error) {
+			const errMsg = error.response?.data?.message || "Error resending verification code";
+			set({ error: errMsg, isLoading: false });
 			throw error;
 		}
 	},
@@ -76,7 +88,7 @@ export const useAuthStore = create((set) => ({
 		} catch (error) {
 			set({
 				isLoading: false,
-				error: error.response.data.message || "Error sending reset password email",
+				error: error.response?.data?.message || "Error sending reset password email",
 			});
 			throw error;
 		}
@@ -89,9 +101,59 @@ export const useAuthStore = create((set) => ({
 		} catch (error) {
 			set({
 				isLoading: false,
-				error: error.response.data.message || "Error resetting password",
+				error: error.response?.data?.message || "Error resetting password",
 			});
 			throw error;
 		}
 	},
+	changePassword: async (currentPassword, newPassword) => {
+		set({ isLoading: true, error: null });
+		try {
+			const response = await axios.post(`${API_URL}/change-password`, { currentPassword, newPassword });
+			set({ isLoading: false, message: response.data.message });
+			return response.data;
+		} catch (error) {
+			const errMsg = error.response?.data?.message || "Error changing password";
+			set({ error: errMsg, isLoading: false });
+			throw error;
+		}
+	},
+	updateProfile: async (name, role) => {
+		set({ isLoading: true, error: null });
+		try {
+			const response = await axios.put(`${API_URL}/profile`, { name, role });
+			set({ user: response.data.user, isLoading: false, message: response.data.message });
+			return response.data;
+		} catch (error) {
+			const errMsg = error.response?.data?.message || "Error updating profile";
+			set({ error: errMsg, isLoading: false });
+			throw error;
+		}
+	},
+	clearErrors: () => set({ error: null, message: null }),
 }));
+
+// Configure Axios Interceptor for token refresh flow (transparent 401 handling)
+axios.interceptors.response.use(
+	(response) => response,
+	async (error) => {
+		const originalRequest = error.config;
+		if (
+			error.response?.status === 401 && 
+			!originalRequest._retry && 
+			originalRequest.url && 
+			!originalRequest.url.includes("/refresh-token")
+		) {
+			originalRequest._retry = true;
+			try {
+				await axios.post(`${API_URL}/refresh-token`);
+				return axios(originalRequest);
+			} catch (refreshError) {
+				// Refresh token expired, reset store auth state
+				useAuthStore.setState({ user: null, isAuthenticated: false, isCheckingAuth: false });
+				return Promise.reject(refreshError);
+			}
+		}
+		return Promise.reject(error);
+	}
+);
