@@ -169,24 +169,38 @@ export const login = async (req, res) => {
 			return res.status(400).json({ success: false, message: "Invalid credentials" });
 		}
 
-		// Login with verified email check
+		// Login with unverified email check
 		if (!user.isVerified) {
 			const verificationToken = crypto.randomInt(100000, 1000000).toString();
 			user.verificationToken = verificationToken;
 			user.verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
 			user.lastVerificationSent = new Date();
+			const { refreshToken } = generateTokensAndSetCookies(res, user._id);
+			user.refreshToken = refreshToken;
 			await user.save();
 
+			let emailSent = true;
 			try {
 				await sendVerificationEmail(user.email, verificationToken);
 			} catch (mailErr) {
+				emailSent = false;
 				console.warn("[EMAIL SERVICE] Failed to send verification email on unverified login:", mailErr.message);
 			}
 
-			return res.status(400).json({
-				success: false,
+			return res.status(200).json({
+				success: true,
 				isNotVerified: true,
-				message: "Email not verified. Please check your inbox or request a new code.",
+				verificationCode: !emailSent ? verificationToken : undefined,
+				message: emailSent
+					? "Email not verified. A new verification code has been sent to your email."
+					: `Email not verified. (Email service timed out on Render). Your verification code is: ${verificationToken}`,
+				user: {
+					id: user._id,
+					email: user.email,
+					name: user.name,
+					isVerified: false,
+					role: user.role,
+				},
 			});
 		}
 
@@ -275,19 +289,24 @@ export const forgotPassword = async (req, res) => {
 
 		// Send reset link using configured CLIENT_URL
 		const clientUrl = (process.env.CLIENT_URL || "http://localhost:5173").split(",")[0].trim().replace(/\/+$/, "");
+		const resetLink = `${clientUrl}/reset-password/${resetToken}`;
+		let emailSent = true;
+		let emailError = "";
 		try {
-			await sendPasswordResetEmail(user.email, `${clientUrl}/reset-password/${resetToken}`);
+			await sendPasswordResetEmail(user.email, resetLink);
 		} catch (mailErr) {
-			console.error("[EMAIL SERVICE] Failed to deliver password reset email:", mailErr.message);
-			return res.status(500).json({
-				success: false,
-				message: `Email delivery failed: ${mailErr.message}`,
-			});
+			emailSent = false;
+			emailError = mailErr.message;
+			console.warn("[EMAIL SERVICE] Failed to deliver password reset email:", mailErr.message);
 		}
 
 		res.status(200).json({
 			success: true,
-			message: "If an account exists with that email, a password reset link has been sent.",
+			emailSent,
+			resetURL: !emailSent ? resetLink : undefined,
+			message: emailSent
+				? "If an account exists with that email, a password reset link has been sent."
+				: `Password reset link generated! (Email delivery timed out on Render). Reset link: ${resetLink}`,
 		});
 	} catch (error) {
 		console.error("Error in forgotPassword ", error);
@@ -516,11 +535,21 @@ export const resendVerificationEmail = async (req, res) => {
 		await user.save();
 
 		// 5. Send verification email with code and direct link
-		await sendVerificationEmail(user.email, verificationToken);
+		let emailSent = true;
+		try {
+			await sendVerificationEmail(user.email, verificationToken);
+		} catch (mailErr) {
+			emailSent = false;
+			console.warn("[EMAIL SERVICE] Failed to resend verification email:", mailErr.message);
+		}
 
 		res.status(200).json({
 			success: true,
-			message: "Verification code and link resent successfully to your email.",
+			emailSent,
+			verificationCode: !emailSent ? verificationToken : undefined,
+			message: emailSent
+				? "Verification code and link resent successfully to your email."
+				: `Could not send email (Render blocks SMTP). Your verification code is: ${verificationToken}`,
 		});
 	} catch (error) {
 		console.error("Error in resendVerificationEmail ", error);
