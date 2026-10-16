@@ -92,14 +92,20 @@ app.use("/api/auth/signup", authLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/forgot-password", authLimiter);
 app.use("/api/auth/resend-verification", authLimiter);
+app.use("/signup", authLimiter);
+app.use("/login", authLimiter);
+app.use("/forgot-password", authLimiter);
+app.use("/resend-verification", authLimiter);
 
 // Health check endpoint (for Render / uptime monitoring)
 app.get("/api/health", (req, res) => {
 	res.status(200).json({ status: "healthy", uptime: process.uptime() });
 });
 
-// Routes
+// Routes - support standard /api/auth as well as /api and direct root endpoints
 app.use("/api/auth", authRoutes);
+app.use("/api", authRoutes);
+app.use("/", authRoutes);
 
 const frontendDist = path.join(__dirname, "Frontend", "dist");
 

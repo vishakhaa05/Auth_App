@@ -1,10 +1,22 @@
 import { create } from "zustand";
 import axios from "axios";
 
-const rawApiUrl = import.meta.env.VITE_API_URL;
-const API_URL = rawApiUrl
-	? rawApiUrl.replace(/\/+$/, "")
-	: (import.meta.env.MODE === "production" ? "/api/auth" : "http://localhost:5001/api/auth");
+const formatApiUrl = () => {
+	const rawUrl = (import.meta.env.VITE_API_URL || "").trim().replace(/\/+$/, "");
+	if (!rawUrl) {
+		return import.meta.env.MODE === "production" ? "/api/auth" : "http://localhost:5001/api/auth";
+	}
+	// Automatically append /api/auth if omitted by user in environment variables
+	if (rawUrl.endsWith("/api/auth")) {
+		return rawUrl;
+	}
+	if (rawUrl.endsWith("/api")) {
+		return `${rawUrl}/auth`;
+	}
+	return `${rawUrl}/api/auth`;
+};
+
+const API_URL = formatApiUrl();
 axios.defaults.withCredentials = true;
 
 export const useAuthStore = create((set) => ({
