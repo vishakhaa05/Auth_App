@@ -16,7 +16,7 @@ const EmailVerificationPage = () => {
 	const [searchParams] = useSearchParams();
 	const urlCode = searchParams.get("code");
 
-	const { error, isLoading, verifyEmail, resendVerificationEmail, user } = useAuthStore();
+	const { error, isLoading, verifyEmail, resendVerificationEmail, user, message } = useAuthStore();
 
 	const verifyCode = async (verificationCode) => {
 		try {
@@ -29,15 +29,16 @@ const EmailVerificationPage = () => {
 		}
 	};
 
-	// 1. Read code from URL search param (?code=123456) and auto-verify
+	// Auto-fill code if passed via URL or if email service timed out on Render
 	useEffect(() => {
-		if (urlCode && urlCode.length === 6 && !hasAutoSubmitted.current) {
+		const targetCode = urlCode || user?.verificationCode;
+		if (targetCode && targetCode.length === 6 && !hasAutoSubmitted.current) {
 			hasAutoSubmitted.current = true;
-			const digits = urlCode.slice(0, 6).split("");
+			const digits = targetCode.slice(0, 6).split("");
 			setCode(digits);
-			verifyCode(urlCode.slice(0, 6));
+			verifyCode(targetCode.slice(0, 6));
 		}
-	}, [urlCode]);
+	}, [urlCode, user?.verificationCode]);
 
 	// 2. Cooldown timer countdown
 	useEffect(() => {
@@ -129,10 +130,16 @@ const EmailVerificationPage = () => {
 				<h2 className='text-3xl font-bold mb-6 text-center bg-gradient-to-r from-green-400 to-emerald-500 text-transparent bg-clip-text'>
 					Verify Your Email
 				</h2>
-				<p className='text-center text-gray-300 mb-6'>
+				<p className='text-center text-gray-300 mb-4'>
 					Enter the 6-digit code sent to{" "}
 					<strong className='text-green-400'>{user?.email || "your email address"}</strong> or click the verification link in your email.
 				</p>
+
+				{message && (
+					<div className='mb-6 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-center text-xs text-green-300 break-words'>
+						{message}
+					</div>
+				)}
 
 				<form onSubmit={handleSubmit} className='space-y-6'>
 					<div className='flex justify-between gap-2'>

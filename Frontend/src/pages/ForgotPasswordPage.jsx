@@ -9,13 +9,17 @@ import toast from "react-hot-toast";
 const ForgotPasswordPage = () => {
     const [email, setEmail] = useState("");
     const [isSubmitted, setIsSubmitted] = useState(false);
+    const [resetLink, setResetLink] = useState("");
 
     const { isLoading, forgotPassword, error, message } = useAuthStore();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await forgotPassword(email);
+            const res = await forgotPassword(email);
+            if (res?.resetURL) {
+                setResetLink(res.resetURL);
+            }
             setIsSubmitted(true);
         } catch (err) {
             toast.error(err.response?.data?.message || "Failed to send reset link");
@@ -67,9 +71,22 @@ const ForgotPasswordPage = () => {
                         >
                             <Mail className='h-8 w-8 text-white' />
                         </motion.div>
-                        <p className='text-gray-300 mb-6 break-words'>
+                        <p className='text-gray-300 mb-4 break-words'>
                             {message || `If an account exists for ${email}, you will receive a password reset link shortly.`}
                         </p>
+                        {resetLink && (
+                            <div className='mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-left'>
+                                <p className='text-xs text-yellow-400 font-semibold mb-2'>
+                                    ⚠️ Render firewall blocked SMTP to Gmail. Use this link directly:
+                                </p>
+                                <a
+                                    href={resetLink}
+                                    className='inline-block w-full text-center py-2 px-3 bg-green-500 hover:bg-green-600 text-white rounded font-medium text-sm transition shadow'
+                                >
+                                    Reset Password Now ➔
+                                </a>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

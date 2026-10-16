@@ -32,10 +32,15 @@ export const useAuthStore = create((set) => ({
 		try {
 			const response = await axios.post(`${API_URL}/signup`, { email, password, name });
 			if (response.data && response.data.user) {
-				set({ user: response.data.user, isAuthenticated: true, isLoading: false });
+				const user = response.data.user;
+				if (response.data.verificationCode) {
+					user.verificationCode = response.data.verificationCode;
+				}
+				set({ user, isAuthenticated: true, isLoading: false, message: response.data.message || null });
 			} else {
 				set({ user: null, isAuthenticated: false, isLoading: false });
 			}
+			return response.data;
 		} catch (error) {
 			set({ user: null, isAuthenticated: false, error: error.response?.data?.message || "Error signing up", isLoading: false });
 			throw error;
@@ -46,9 +51,13 @@ export const useAuthStore = create((set) => ({
 		try {
 			const response = await axios.post(`${API_URL}/login`, { email, password });
 			if (response.data && response.data.user) {
+				const user = response.data.user;
+				if (response.data.verificationCode) {
+					user.verificationCode = response.data.verificationCode;
+				}
 				set({
 					isAuthenticated: true,
-					user: response.data.user,
+					user,
 					error: null,
 					isLoading: false,
 					message: response.data.message || null,
@@ -91,7 +100,15 @@ export const useAuthStore = create((set) => ({
 		set({ isLoading: true, error: null });
 		try {
 			const response = await axios.post(`${API_URL}/resend-verification`, { email });
-			set({ isLoading: false, message: response.data.message });
+			if (response.data?.verificationCode) {
+				set((state) => ({
+					user: state.user ? { ...state.user, verificationCode: response.data.verificationCode } : state.user,
+					isLoading: false,
+					message: response.data.message,
+				}));
+			} else {
+				set({ isLoading: false, message: response.data.message });
+			}
 			return response.data;
 		} catch (error) {
 			const errMsg = error.response?.data?.message || "Error resending verification code";
