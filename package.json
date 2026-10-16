@@ -1,22 +1,21 @@
 {
   "name": "auth-app",
   "version": "1.0.0",
-  "description": "",
+  "description": "Full-Stack Authentication Application",
   "main": "Backend/index.js",
+  "type": "module",
   "scripts": {
-    "dev": "nodemon Backend/index.js"
+    "start": "node Backend/index.js",
+    "dev": "nodemon Backend/index.js",
+    "build": "npm install --prefix Frontend && npm run build --prefix Frontend"
   },
   "keywords": [],
   "author": "",
-  "type": "module",
   "license": "ISC",
   "dependencies": {
-    "@tailwindcss/vite": "^4.2.2",
-    "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
-    "crypto": "^1.0.1",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-mongo-sanitize": "^2.2.0",
@@ -25,9 +24,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.1",
     "nodemailer": "^7.0.13",
-    "tailwindcss": "^4.2.2",
-    "xss": "^1.0.15",
-    "zustand": "^5.0.12"
+    "xss": "^1.0.15"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

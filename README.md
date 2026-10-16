@@ -139,18 +139,59 @@ On server boot, Nodemailer verifies your SMTP connection. Check the console outp
 
 ---
 
-## 7. Production Deployment & Hosting Considerations
+---
 
-### Environment Variables
-When deploying to platforms such as Render, Railway, AWS, Heroku, or Vercel:
-- Set `NODE_ENV=production`.
-- Set `CLIENT_URL` to your production frontend domain (e.g., `https://your-app.com`).
-- Add `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM` in the hosting provider's secure dashboard.
+## 7. Production Deployment Guide (Render & Vercel)
 
-### Outbound SMTP Ports & Hosting Restrictions
-- **Port 465 (SSL)**: Recommended for Gmail SMTP. Most cloud providers allow port 465 outbound.
-- **Port 587 (TLS/STARTTLS)**: Also supported.
-- **Provider Restrictions**: Some cloud hosts (e.g., AWS EC2 default policies or certain DigitalOcean droplets) block outbound port 25 or restrict ports 465/587 by default. If your provider blocks outbound SMTP connections, ensure port 465/587 egress is permitted in your security groups or network firewalls.
+### Option A: Frontend on Vercel + Backend on Render (Recommended)
+
+#### Step 1: Deploy Backend on Render
+1. Go to [Render Dashboard](https://dashboard.render.com/) and click **New + > Web Service**.
+2. Connect your GitHub repository.
+3. Configure the settings:
+   - **Name**: `auth-app-backend` (or your choice)
+   - **Region**: Choose the closest region
+   - **Root Directory**: *(leave blank / root)*
+   - **Runtime**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `node Backend/index.js` (or `npm start`)
+4. Under **Environment Variables**, add:
+   - `NODE_ENV`: `production`
+   - `PORT`: `5001`
+   - `MONGO_URI`: `your_mongodb_connection_string`
+   - `JWT_SECRET`: `your_jwt_secret`
+   - `JWT_REFRESH_SECRET`: `your_jwt_refresh_secret`
+   - `SMTP_HOST`: `smtp.gmail.com`
+   - `SMTP_PORT`: `465`
+   - `SMTP_USER`: `your_email@gmail.com`
+   - `SMTP_PASS`: `your_16_char_google_app_password`
+   - `EMAIL_FROM`: `your_email@gmail.com`
+   - `CLIENT_URL`: `https://your-frontend-name.vercel.app` *(update once frontend is created)*
+5. Click **Create Web Service**. Copy your backend URL (e.g., `https://auth-app-backend.onrender.com`).
+
+#### Step 2: Deploy Frontend on Vercel
+1. Go to [Vercel Dashboard](https://vercel.com/dashboard) and click **Add New... > Project**.
+2. Import your GitHub repository.
+3. In the project configuration:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: Click **Edit** and select `Frontend`
+   - **Build Command**: `npm run build` (default)
+   - **Output Directory**: `dist` (default)
+   - **Install Command**: `npm install` (default)
+4. Under **Environment Variables**, add:
+   - `VITE_API_URL`: `https://auth-app-backend.onrender.com/api/auth` *(your Render backend URL + `/api/auth`)*
+5. Click **Deploy**.
+6. Once deployed, copy your Vercel URL (e.g., `https://your-frontend-name.vercel.app`) and update the `CLIENT_URL` environment variable on Render!
+
+---
+
+### Option B: Monolithic Deployment on Render (Full-Stack all-in-one)
+If you prefer hosting both frontend and backend together on a single Render Web Service:
+1. Create a **Web Service** on Render connected to this repository.
+2. Settings:
+   - **Build Command**: `npm run build` *(installs dependencies and builds the Frontend)*
+   - **Start Command**: `npm start` *(starts the Express server, which serves API routes and `/Frontend/dist`)*
+3. Add all backend environment variables listed above. `CLIENT_URL` can point to your Render service URL.
 
 ---
 

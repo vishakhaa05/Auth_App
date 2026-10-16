@@ -1,5 +1,15 @@
 import jwt from "jsonwebtoken";
 
+export const getCookieOptions = (maxAge) => {
+	const isProduction = process.env.NODE_ENV === "production";
+	return {
+		httpOnly: true,
+		secure: isProduction,
+		sameSite: isProduction ? "none" : "lax",
+		...(maxAge ? { maxAge } : {}),
+	};
+};
+
 export const generateTokensAndSetCookies = (res, userId) => {
 	const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET, {
 		expiresIn: "15m",
@@ -10,20 +20,10 @@ export const generateTokensAndSetCookies = (res, userId) => {
 	});
 
 	// Set access token cookie (named 'token' for backward compatibility)
-	res.cookie("token", accessToken, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
-		sameSite: "strict",
-		maxAge: 15 * 60 * 1000, // 15 minutes
-	});
+	res.cookie("token", accessToken, getCookieOptions(15 * 60 * 1000)); // 15 minutes
 
 	// Set refresh token cookie
-	res.cookie("refreshToken", refreshToken, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
-		sameSite: "strict",
-		maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-	});
+	res.cookie("refreshToken", refreshToken, getCookieOptions(7 * 24 * 60 * 60 * 1000)); // 7 days
 
 	return { accessToken, refreshToken };
 };

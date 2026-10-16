@@ -3,7 +3,7 @@ import bcryptjs from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 
-import { generateTokensAndSetCookies } from "../utils/generateTokenAndSetCookie.js";
+import { generateTokensAndSetCookies, getCookieOptions } from "../utils/generateTokenAndSetCookie.js";
 import { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail, sendResetSuccessEmail } from "../utils/emails.js";
 
 export const signup = async (req, res) => {
@@ -190,8 +190,9 @@ export const logout = async (req, res) => {
 			}
 		}
 
-		res.clearCookie("token");
-		res.clearCookie("refreshToken");
+		const cookieOptions = getCookieOptions();
+		res.clearCookie("token", cookieOptions);
+		res.clearCookie("refreshToken", cookieOptions);
 		res.status(200).json({ success: true, message: "Logged out successfully" });
 	} catch (error) {
 		res.status(500).json({ success: false, message: error.message });

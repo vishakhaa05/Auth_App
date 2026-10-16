@@ -2,7 +2,10 @@ import mongoose from "mongoose";
 
 export const connectDB = async () => {
 	try {
-		console.log("mongo_uri: ", process.env.MONGO_URI);
+		const safeUri = process.env.MONGO_URI
+			? process.env.MONGO_URI.replace(/\/\/([^:]+):([^@]+)@/, "//$1:****@")
+			: "undefined";
+		console.log("Connecting to MongoDB:", safeUri);
 		const conn = await mongoose.connect(process.env.MONGO_URI);
 		console.log(`MongoDB Connected: ${conn.connection.host}`);
 	} catch (error) {

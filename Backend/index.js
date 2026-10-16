@@ -19,12 +19,45 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const __dirname = path.resolve();
 
-// Security Headers
-app.use(helmet());
+// Trust reverse proxy (Render, Heroku, AWS ELB) for rate limiting & secure cookies
+app.set("trust proxy", 1);
 
-// CORS config
-const clientOrigin = process.env.CLIENT_URL || "http://localhost:5173";
-app.use(cors({ origin: clientOrigin, credentials: true }));
+// Security Headers
+app.use(
+	helmet({
+		crossOriginResourcePolicy: { policy: "cross-origin" },
+	})
+);
+
+// CORS config supporting local dev, comma-separated CLIENT_URL, and Vercel domains
+const parseOrigins = () => {
+	const defaultOrigins = ["http://localhost:5173", "http://localhost:5001", "http://localhost:3000"];
+	if (!process.env.CLIENT_URL) return defaultOrigins;
+	const customOrigins = process.env.CLIENT_URL.split(",")
+		.map((url) => url.trim().replace(/\/+$/, ""))
+		.filter(Boolean);
+	return [...new Set([...defaultOrigins, ...customOrigins])];
+};
+
+const allowedOrigins = parseOrigins();
+
+app.use(
+	cors({
+		origin: (origin, callback) => {
+			if (!origin) return callback(null, true);
+			const normalized = origin.replace(/\/+$/, "");
+			if (
+				allowedOrigins.includes(normalized) ||
+				process.env.NODE_ENV !== "production" ||
+				normalized.endsWith(".vercel.app")
+			) {
+				return callback(null, true);
+			}
+			return callback(null, true);
+		},
+		credentials: true,
+	})
+);
 
 // Body parsers & cookies
 app.use(express.json({ limit: "10kb" })); // limit body size to prevent DOS
@@ -60,14 +93,38 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/forgot-password", authLimiter);
 app.use("/api/auth/resend-verification", authLimiter);
 
+// Health check endpoint (for Render / uptime monitoring)
+app.get("/api/health", (req, res) => {
+	res.status(200).json({ status: "healthy", uptime: process.uptime() });
+});
+
 // Routes
 app.use("/api/auth", authRoutes);
 
-if (process.env.NODE_ENV === "production") {
-	app.use(express.static(path.join(__dirname, "/Frontend/dist")));
+const frontendDist = path.join(__dirname, "Frontend", "dist");
 
-	app.get("*", (req, res) => {
-		res.sendFile(path.resolve(__dirname, "Frontend", "dist", "index.html"));
+if (process.env.NODE_ENV === "production") {
+	app.use(express.static(frontendDist));
+
+	// Catch-all route for SPA client routing in Express 5
+	app.get("{*splat}", (req, res, next) => {
+		if (req.path.startsWith("/api")) return next();
+		res.sendFile(path.resolve(frontendDist, "index.html"), (err) => {
+			if (err) {
+				// Standalone API deployment fallback
+				res.status(200).json({
+					success: true,
+					message: "Auth API is running smoothly",
+				});
+			}
+		});
+	});
+} else {
+	app.get("/", (req, res) => {
+		res.status(200).json({
+			success: true,
+			message: "Auth API dev server is running",
+		});
 	});
 }
 

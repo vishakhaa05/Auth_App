@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api/auth";
+const rawApiUrl = import.meta.env.VITE_API_URL;
+const API_URL = rawApiUrl
+	? rawApiUrl.replace(/\/+$/, "")
+	: (import.meta.env.MODE === "production" ? "/api/auth" : "http://localhost:5001/api/auth");
 axios.defaults.withCredentials = true;
 
 export const useAuthStore = create((set) => ({
